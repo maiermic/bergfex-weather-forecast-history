@@ -121,11 +121,29 @@ async function getWebcamData(url: string): Promise<WebcamData> {
   };
 }
 
-export const webcamData =
+async function storeWebcamData(data: WebcamData): Promise<string | null> {
+  const db = admin.firestore();
+  const webcamsCollection = db.collection('webcams');
+  const snapshot =
+    await webcamsCollection.where('date', '==', data.date).limit(1).get();
+  if (snapshot.empty) {
+    const document = await webcamsCollection.add(data);
+    return document.id;
+  }
+  return null;
+}
+
+export const webcam =
   functions.https.onRequest(async (request, response) => {
     const result = await getWebcamData(webcamUrl);
     response.send(JSON.stringify(result, null, 4));
   });
+
+export const storeWebcam = functions.https.onRequest(async (request, response) => {
+  const data = await getWebcamData(webcamUrl);
+  const documentId = await storeWebcamData(data);
+  response.send(JSON.stringify(documentId, null, 4));
+});
 
 export const forecast = functions.https.onRequest(async (request, response) => {
   const result = await getForecast(forecastUrl);
