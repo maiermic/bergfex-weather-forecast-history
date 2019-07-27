@@ -6,6 +6,7 @@ import * as admin from 'firebase-admin';
 admin.initializeApp(functions.config().firebase);
 
 const forecastUrl = 'https://www.bergfex.at/hintertux/wetter/prognose/';
+const webcamUrl = 'https://webtv.feratel.com/webtv/?design=v3&pg=121E2E32-862A-4791-8936-B41853615FB6&cam=5552';
 
 function getTemperatureGroupData($temperatureGroup: Cheerio) {
   return {
@@ -90,6 +91,41 @@ async function storeForecastsData(forecastsData: Forecast[]): Promise<string[]> 
     }));
   return ids.filter((id): id is string => typeof id === "string");
 }
+
+interface WebcamData {
+  date: Date
+  temperature: string
+  wind: string
+}
+
+async function getWebcamData(url: string): Promise<WebcamData> {
+  const {data} = await axios.get(url);
+  const $ = cheerio.load(data);
+  const date = new Date();
+  const timeStr = $('#video_clock_div').text().trim();
+  const timeMatch = timeStr.match(/(\d+):(\d+) ([PA]M)/);
+  if (!timeMatch) {
+    throw Error(`Could not parse time: "${timeStr}"`);
+  }
+  const [, hoursStr, minutesStr, meridiem] = timeMatch;
+  const hours = meridiem === 'PM' ? parseInt(hoursStr) + 12 : parseInt(hoursStr);
+  const minutes = parseInt(minutesStr);
+  if (date.getUTCHours() < hours && date.getUTCMinutes() < minutes) {
+    date.setUTCDate(date.getUTCDate() - 1);
+  }
+  date.setUTCHours(hours, minutes, 0, 0);
+  return {
+    date,
+    temperature: $('#hidden_wetter_div').attr('value'),
+    wind: $('#hidden_wetterWind_div').attr('value'),
+  };
+}
+
+export const webcamData =
+  functions.https.onRequest(async (request, response) => {
+    const result = await getWebcamData(webcamUrl);
+    response.send(JSON.stringify(result, null, 4));
+  });
 
 export const forecast = functions.https.onRequest(async (request, response) => {
   const result = await getForecast(forecastUrl);
