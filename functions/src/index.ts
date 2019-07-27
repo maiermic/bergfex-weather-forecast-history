@@ -1,6 +1,11 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
+
+admin.initializeApp(functions.config().firebase);
+
+const forecastUrl = 'https://www.bergfex.at/hintertux/wetter/prognose/';
 
 function getTemperatureGroupData($temperatureGroup: Cheerio) {
   return {
@@ -10,7 +15,25 @@ function getTemperatureGroupData($temperatureGroup: Cheerio) {
   };
 }
 
-async function getForecast(url: string) {
+interface TemperatureGroupData {
+  max: string
+  min: string
+  snow: string
+}
+
+interface Forecast {
+  date: Date
+  mountain: TemperatureGroupData
+  valley: TemperatureGroupData
+  probabilityOfPrecipitation: string
+  rainfall: string
+  sun: string
+  snowLine: string
+  thunderstorm: string
+  wind: string
+}
+
+async function getForecast(url: string): Promise<Forecast[]> {
   const {data} = await axios.get(url);
   const $ = cheerio.load(data);
   const $container = $('.forecast9d-container');
@@ -53,6 +76,19 @@ async function getForecast(url: string) {
 }
 
 export const forecast = functions.https.onRequest(async (request, response) => {
-  const result = await getForecast('https://www.bergfex.at/hintertux/wetter/prognose/');
+  const result = await getForecast(forecastUrl);
   response.send(JSON.stringify(result, null, 4));
+});
+
+export const storeForecast = functions.https.onRequest(async (request, response) => {
+  const db = admin.firestore();
+  const forecastsCollection = db.collection('forecasts');
+  const forecastsData = await getForecast(forecastUrl);
+  const documentIds =
+    await Promise.all(
+      forecastsData.map(async data => {
+        const document = await forecastsCollection.add(data);
+        return document.id;
+      }));
+  response.send(JSON.stringify(documentIds, null, 4));
 });
