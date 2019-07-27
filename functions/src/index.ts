@@ -145,6 +145,15 @@ export const storeWebcam = functions.https.onRequest(async (request, response) =
   response.send(JSON.stringify(documentId, null, 4));
 });
 
+export const scheduledStoreWebcam =
+  functions.pubsub.schedule('every 10 mins from 05:00 to 22:00')
+    .timeZone('Europe/Berlin')
+    .onRun(async (context) => {
+      const data = await getWebcamData(webcamUrl);
+      const documentId = await storeWebcamData(data);
+      console.log('stored', JSON.stringify(documentId, null, 4));
+    });
+
 export const forecast = functions.https.onRequest(async (request, response) => {
   const result = await getForecast(forecastUrl);
   response.send(JSON.stringify(result, null, 4));
