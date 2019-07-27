@@ -55,7 +55,7 @@ async function getForecast(url: string): Promise<Forecast[]> {
         throw Error(`Could not parse time: "${timeStr}"`);
       }
       const [, hours, minutes] = timeMatch;
-      date.setUTCHours(parseInt(hours), parseInt(minutes));
+      date.setUTCHours(parseInt(hours), parseInt(minutes), 0, 0);
       const $mountain = $day.find('.group').eq(0);
       const $valley = $day.find('.group').eq(1);
       const mountain = getTemperatureGroupData($mountain);
@@ -78,11 +78,17 @@ async function getForecast(url: string): Promise<Forecast[]> {
 async function storeForecastsData(forecastsData: Forecast[]): Promise<string[]> {
   const db = admin.firestore();
   const forecastsCollection = db.collection('forecasts');
-  return await Promise.all(
+  const ids = await Promise.all(
     forecastsData.map(async data => {
-      const document = await forecastsCollection.add(data);
-      return document.id;
+      const snapshot =
+        await forecastsCollection.where('date', '==', data.date).limit(1).get();
+      if (snapshot.empty) {
+        const document = await forecastsCollection.add(data);
+        return document.id;
+      }
+      return undefined;
     }));
+  return ids.filter((id): id is string => typeof id === "string");
 }
 
 export const forecast = functions.https.onRequest(async (request, response) => {
