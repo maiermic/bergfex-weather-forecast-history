@@ -97,8 +97,10 @@ export const storeForecast = functions.https.onRequest(async (request, response)
 });
 
 export const scheduledStoreForecast =
-  functions.pubsub.schedule('0 1 * * *').onRun(async (context) => {
-    const forecastsData = await getForecast(forecastUrl);
-    const documentIds = await storeForecastsData(forecastsData);
-    console.log('stored', JSON.stringify(documentIds, null, 4));
-  });
+  functions.pubsub.schedule('every 1 hours')
+    .timeZone('Europe/Berlin')
+    .onRun(async (context) => {
+      const forecastsData = await getForecast(forecastUrl);
+      const documentIds = await storeForecastsData(forecastsData);
+      console.log('stored', JSON.stringify(documentIds, null, 4));
+    });
