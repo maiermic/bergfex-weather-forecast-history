@@ -75,20 +75,30 @@ async function getForecast(url: string): Promise<Forecast[]> {
     .get();
 }
 
+async function storeForecastsData(forecastsData: Forecast[]): Promise<string[]> {
+  const db = admin.firestore();
+  const forecastsCollection = db.collection('forecasts');
+  return await Promise.all(
+    forecastsData.map(async data => {
+      const document = await forecastsCollection.add(data);
+      return document.id;
+    }));
+}
+
 export const forecast = functions.https.onRequest(async (request, response) => {
   const result = await getForecast(forecastUrl);
   response.send(JSON.stringify(result, null, 4));
 });
 
 export const storeForecast = functions.https.onRequest(async (request, response) => {
-  const db = admin.firestore();
-  const forecastsCollection = db.collection('forecasts');
   const forecastsData = await getForecast(forecastUrl);
-  const documentIds =
-    await Promise.all(
-      forecastsData.map(async data => {
-        const document = await forecastsCollection.add(data);
-        return document.id;
-      }));
+  const documentIds = await storeForecastsData(forecastsData);
   response.send(JSON.stringify(documentIds, null, 4));
 });
+
+export const scheduledStoreForecast =
+  functions.pubsub.schedule('0 1 * * *').onRun(async (context) => {
+    const forecastsData = await getForecast(forecastUrl);
+    const documentIds = await storeForecastsData(forecastsData);
+    console.log('stored', JSON.stringify(documentIds, null, 4));
+  });
