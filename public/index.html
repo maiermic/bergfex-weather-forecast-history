@@ -10,6 +10,7 @@
     <!-- include only the Firebase features as you need -->
     <script defer src="/__/firebase/6.3.3/firebase-auth.js"></script>
     <script defer src="/__/firebase/6.3.3/firebase-database.js"></script>
+    <script defer src="/__/firebase/6.3.3/firebase-firestore.js"></script>
     <script defer src="/__/firebase/6.3.3/firebase-messaging.js"></script>
     <script defer src="/__/firebase/6.3.3/firebase-storage.js"></script>
     <!-- initialize the SDK after all desired features are loaded -->
@@ -55,11 +56,30 @@
           let app = firebase.app();
           let features = ['auth', 'database', 'messaging', 'storage'].filter(feature => typeof app[feature] === 'function');
           document.getElementById('load').innerHTML = `Firebase SDK loaded with ${features.join(', ')}`;
+          getData();
         } catch (e) {
           console.error(e);
           document.getElementById('load').innerHTML = 'Error loading the Firebase SDK, check the console.';
         }
       });
+
+      async function getData() {
+        const db = firebase.app().firestore();
+        const webcamsCollection = db.collection('webcams');
+        const result = await webcamsCollection.orderBy('date', 'desc').get();
+        const formatDateTime = new Intl.DateTimeFormat('de-DE', {
+          year: '2-digit', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit'
+        }).format;
+        result.forEach(dqs => {
+          const data = dqs.data();
+          /** @type Date */
+          const date = data.date.toDate();
+          console.log(`${dqs.id}\t${formatDateTime(date)}\t${data.temperature}`);
+        });
+        // result.forEach(dqs => console.log(dqs.id, dqs.data().temperature));
+        console.log(`result\t${result}`);
+      }
     </script>
   </body>
 </html>
