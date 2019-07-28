@@ -1,4 +1,5 @@
 import axios from 'axios';
+import {DateTime} from 'luxon';
 import * as cheerio from 'cheerio';
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
@@ -34,35 +35,44 @@ interface Forecast {
   wind: string
 }
 
+function now() {
+  return DateTime.local().setZone('Europe/Berlin');
+}
+
 async function getForecast(url: string): Promise<Forecast[]> {
   const {data} = await axios.get(url);
   const $ = cheerio.load(data);
   const $container = $('.forecast9d-container');
   return $container
     .find('.day')
-    .map((_, dayElement) => {
+    .map((_, dayElement): Forecast => {
       const $day = $(dayElement);
-      const date = new Date();
       const title = $day.attr('title');
       const dateMatch = title.match(/(\d+)\.(\d+)\.(\d+)/);
       if (!dateMatch) {
         throw Error(`Could not parse date in title: "${title}"`);
       }
       const [, day, month, year] = dateMatch;
-      date.setUTCFullYear(parseInt(year), parseInt(month) - 1, parseInt(day));
       const timeStr = $container.find('.time').text();
       const timeMatch = timeStr.match(/(\d+):(\d+)/);
       if (!timeMatch) {
         throw Error(`Could not parse time: "${timeStr}"`);
       }
-      const [, hours, minutes] = timeMatch;
-      date.setUTCHours(parseInt(hours), parseInt(minutes), 0, 0);
+      const [, hour, minute] = timeMatch;
       const $mountain = $day.find('.group').eq(0);
       const $valley = $day.find('.group').eq(1);
       const mountain = getTemperatureGroupData($mountain);
       const valley = getTemperatureGroupData($valley);
       return {
-        date,
+        date: now().set({
+          year: parseInt(year),
+          month: parseInt(month),
+          day: parseInt(day),
+          hour: parseInt(hour),
+          minute: parseInt(minute),
+          second: 0,
+          millisecond: 0,
+        }).toJSDate(),
         mountain,
         valley,
         probabilityOfPrecipitation: $day.find('.rrp').text().trim(),
@@ -78,7 +88,7 @@ async function getForecast(url: string): Promise<Forecast[]> {
 
 async function storeForecastsData(forecastsData: Forecast[]): Promise<string[]> {
   const db = admin.firestore();
-  const forecastsCollection = db.collection('forecasts');
+  const forecastsCollection = db.collection('forecastsFixed');
   const ids = await Promise.all(
     forecastsData.map(async data => {
       const snapshot =
@@ -101,21 +111,19 @@ interface WebcamData {
 async function getWebcamData(url: string): Promise<WebcamData> {
   const {data} = await axios.get(url);
   const $ = cheerio.load(data);
-  const date = new Date();
   const timeStr = $('#video_clock_div').text().trim();
   const timeMatch = timeStr.match(/(\d+):(\d+) ([PA]M)/);
   if (!timeMatch) {
     throw Error(`Could not parse time: "${timeStr}"`);
   }
-  const [, hoursStr, minutesStr, meridiem] = timeMatch;
-  const hours = meridiem === 'PM' ? parseInt(hoursStr) + 12 : parseInt(hoursStr);
-  const minutes = parseInt(minutesStr);
-  if (date.getUTCHours() < hours && date.getUTCMinutes() < minutes) {
-    date.setUTCDate(date.getUTCDate() - 1);
-  }
-  date.setUTCHours(hours, minutes, 0, 0);
+  const [, hour, minute, meridiem] = timeMatch;
   return {
-    date,
+    date: now().set({
+      hour: meridiem === 'PM' ? parseInt(hour) + 12 : parseInt(hour),
+      minute: parseInt(minute),
+      second: 0,
+      millisecond: 0,
+    }).toJSDate(),
     temperature: $('#hidden_wetter_div').attr('value'),
     wind: $('#hidden_wetterWind_div').attr('value'),
   };
@@ -123,7 +131,7 @@ async function getWebcamData(url: string): Promise<WebcamData> {
 
 async function storeWebcamData(data: WebcamData): Promise<string | null> {
   const db = admin.firestore();
-  const webcamsCollection = db.collection('webcams');
+  const webcamsCollection = db.collection('webcamsFixed');
   const snapshot =
     await webcamsCollection.where('date', '==', data.date).limit(1).get();
   if (snapshot.empty) {
@@ -173,3 +181,8 @@ export const scheduledStoreForecast =
       const documentIds = await storeForecastsData(forecastsData);
       console.log('stored', JSON.stringify(documentIds, null, 4));
     });
+
+export const currentDate =
+  functions.https.onRequest(async (request, response) => {
+    response.send(DateTime.local().setZone('Europe/Berlin').toFormat('dd.MM. HH:mm'));
+  });
