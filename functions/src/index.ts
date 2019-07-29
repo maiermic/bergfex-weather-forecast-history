@@ -96,7 +96,7 @@ async function getForecast(url: string): Promise<Forecast[]> {
         mountain,
         valley,
         probabilityOfPrecipitation: $day.find('.rrp').text().trim(),
-        rainfall: $day.find('.rrp').text().trim(),
+        rainfall: $day.find('.rrr').text().trim(),
         sun: $day.find('.sonne').text().trim(),
         snowLine: $day.find('.sgrenze').text().trim(),
         thunderstorm: $day.find('.wgew').text().trim(),
