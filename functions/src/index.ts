@@ -112,7 +112,10 @@ async function storeForecastsData(forecastsData: Forecast[]): Promise<string[]> 
   const ids = await Promise.all(
     forecastsData.map(async data => {
       const snapshot =
-        await forecastsCollection.where('date', '==', data.date).limit(1).get();
+        await forecastsCollection
+          .where('forecastDate', '==', data.forecastDate)
+          .limit(1)
+          .get();
       if (snapshot.empty) {
         const document = await forecastsCollection.add(data);
         return document.id;
