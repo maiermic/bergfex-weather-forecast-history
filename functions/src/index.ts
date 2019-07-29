@@ -24,6 +24,13 @@ interface TemperatureGroupData {
 }
 
 interface Forecast {
+  /**
+   * Issue date of forecast.
+   */
+  forecastDate: Date
+  /**
+   * Forecasted date
+   */
   date: Date
   mountain: TemperatureGroupData
   valley: TemperatureGroupData
@@ -43,6 +50,7 @@ async function getForecast(url: string): Promise<Forecast[]> {
   const {data} = await axios.get(url);
   const $ = cheerio.load(data);
   const $container = $('.forecast9d-container');
+  let forecastDate: DateTime | null = null;
   return $container
     .find('.day')
     .map((_, dayElement): Forecast => {
@@ -63,13 +71,25 @@ async function getForecast(url: string): Promise<Forecast[]> {
       const $valley = $day.find('.group').eq(1);
       const mountain = getTemperatureGroupData($mountain);
       const valley = getTemperatureGroupData($valley);
-      return {
-        date: now().set({
+      if (forecastDate === null) {
+        forecastDate = now().set({
           year: parseInt(year),
           month: parseInt(month),
           day: parseInt(day),
           hour: parseInt(hour),
           minute: parseInt(minute),
+          second: 0,
+          millisecond: 0,
+        });
+      }
+      return {
+        forecastDate: forecastDate.toJSDate(),
+        date: now().set({
+          year: parseInt(year),
+          month: parseInt(month),
+          day: parseInt(day),
+          hour: 0,
+          minute: 0,
           second: 0,
           millisecond: 0,
         }).toJSDate(),
