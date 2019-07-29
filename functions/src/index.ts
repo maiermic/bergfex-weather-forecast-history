@@ -139,10 +139,11 @@ async function getWebcamData(url: string): Promise<WebcamData> {
   if (!timeMatch) {
     throw Error(`Could not parse time: "${timeStr}"`);
   }
-  const [, hour, minute, meridiem] = timeMatch;
+  const [, hourStr, minute, meridiem] = timeMatch;
+  const hour = parseInt(hourStr);
   return {
     date: now().set({
-      hour: meridiem === 'PM' ? parseInt(hour) + 12 : parseInt(hour),
+      hour: meridiem === 'PM' && hour !== 12 ? hour + 12 : hour,
       minute: parseInt(minute),
       second: 0,
       millisecond: 0,
