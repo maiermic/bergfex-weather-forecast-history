@@ -141,13 +141,18 @@ async function getWebcamData(url: string): Promise<WebcamData> {
   }
   const [, hourStr, minute, meridiem] = timeMatch;
   const hour = parseInt(hourStr);
+  const currentTime = now();
+  let date = currentTime.set({
+    hour: meridiem === 'PM' && hour !== 12 ? hour + 12 : hour,
+    minute: parseInt(minute),
+    second: 0,
+    millisecond: 0,
+  });
+  if (currentTime < date) {
+    date = date.minus({day: 1});
+  }
   return {
-    date: now().set({
-      hour: meridiem === 'PM' && hour !== 12 ? hour + 12 : hour,
-      minute: parseInt(minute),
-      second: 0,
-      millisecond: 0,
-    }).toJSDate(),
+    date: date.toJSDate(),
     temperature: $('#hidden_wetter_div').attr('value'),
     wind: $('#hidden_wetterWind_div').attr('value'),
   };
