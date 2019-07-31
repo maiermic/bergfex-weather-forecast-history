@@ -40,6 +40,24 @@ interface Forecast {
   snowLine: string
   thunderstorm: string
   wind: string
+  intervals?: IntervalForecast[]
+}
+
+interface IntervalForecast {
+  mountain: IntervalTemperatureGroupData
+  valley: IntervalTemperatureGroupData
+  probabilityOfPrecipitation: string
+  rainfall: string
+  /** Percentage */
+  sun: number
+  snowLine: string
+  thunderstorm: string
+  wind: string
+}
+
+interface IntervalTemperatureGroupData {
+  max: string
+  snow: string
 }
 
 function now() {
@@ -53,7 +71,7 @@ async function getForecast(url: string): Promise<Forecast[]> {
   let forecastDate: DateTime | null = null;
   return $container
     .find('.day')
-    .map((_, dayElement): Forecast => {
+    .map((index, dayElement): Forecast => {
       const $day = $(dayElement);
       const title = $day.attr('title');
       const dateMatch = title.match(/(\d+)\.(\d+)\.(\d+)/);
@@ -67,10 +85,6 @@ async function getForecast(url: string): Promise<Forecast[]> {
         throw Error(`Could not parse time: "${timeStr}"`);
       }
       const [, hour, minute] = timeMatch;
-      const $mountain = $day.find('.group').eq(0);
-      const $valley = $day.find('.group').eq(1);
-      const mountain = getTemperatureGroupData($mountain);
-      const valley = getTemperatureGroupData($valley);
       if (forecastDate === null) {
         forecastDate = now().set({
           year: parseInt(year),
@@ -82,7 +96,7 @@ async function getForecast(url: string): Promise<Forecast[]> {
           millisecond: 0,
         });
       }
-      return {
+      const result: Forecast = {
         forecastDate: forecastDate.toJSDate(),
         date: now().set({
           year: parseInt(year),
@@ -93,8 +107,8 @@ async function getForecast(url: string): Promise<Forecast[]> {
           second: 0,
           millisecond: 0,
         }).toJSDate(),
-        mountain,
-        valley,
+        mountain: getTemperatureGroupData($day.find('.group').eq(0)),
+        valley: getTemperatureGroupData($day.find('.group').eq(1)),
         probabilityOfPrecipitation: $day.find('.rrp').text().trim(),
         rainfall: $day.find('.rrr').text().trim(),
         sun: $day.find('.sonne').text().trim(),
@@ -102,6 +116,39 @@ async function getForecast(url: string): Promise<Forecast[]> {
         thunderstorm: $day.find('.wgew').text().trim(),
         wind: $day.find('.ff').text().trim(),
       };
+      const $intervalContainer = $(`#forecast-day-${index}-intervals`);
+      if ($intervalContainer.length) {
+        result.intervals = [];
+        const $intervals = $intervalContainer.find('.interval');
+        $intervals.each((i, e) => {
+          const $interval = $(e);
+          const $nextInterval = $intervals.eq(i + 1);
+          const temperatureMax = $interval.find('.group').eq(0).find('.tmax');
+          if ($nextInterval.length) {
+            const snow = $nextInterval.find('.group').eq(1).find('.nschnee');
+            const sunMatch = $nextInterval.find('.sonne').attr('class').match(/sonne(\d+)/);
+            const sun = sunMatch ? parseInt(sunMatch[1]) : 0;
+            // @ts-ignore
+            result.intervals.push({
+              mountain: {
+                max: temperatureMax.eq(0).text().trim(),
+                snow: snow.eq(0).text().trim(),
+              },
+              valley: {
+                max: temperatureMax.eq(1).text().trim(),
+                snow: snow.eq(1).text().trim(),
+              },
+              probabilityOfPrecipitation: $nextInterval.find('.rrp').text().trim(),
+              rainfall: $nextInterval.find('.rrr').text().trim(),
+              sun,
+              snowLine: $nextInterval.find('.sgrenze').text().trim(),
+              thunderstorm: $nextInterval.find('.wgew').text().trim(),
+              wind: $nextInterval.find('.ff').text().trim(),
+            });
+          }
+        });
+      }
+      return result;
     })
     .get();
 }
