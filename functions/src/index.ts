@@ -236,7 +236,7 @@ export const storeWebcam = functions.https.onRequest(async (request, response) =
 export const scheduledStoreWebcam =
   functions.pubsub.schedule('every 10 mins from 05:00 to 22:00')
     .timeZone('Europe/Berlin')
-    .onRun(async (context) => {
+    .onRun(async () => {
       const data = await getWebcamData(webcamUrl);
       const documentId = await storeWebcamData(data);
       console.log('stored', JSON.stringify(documentId, null, 4));
@@ -256,7 +256,7 @@ export const storeForecast = functions.https.onRequest(async (request, response)
 export const scheduledStoreForecast =
   functions.pubsub.schedule('every 1 hours')
     .timeZone('Europe/Berlin')
-    .onRun(async (context) => {
+    .onRun(async () => {
       const forecastsData = await getForecast(forecastUrl);
       const documentIds = await storeForecastsData(forecastsData);
       console.log('stored', JSON.stringify(documentIds, null, 4));
