@@ -117,6 +117,7 @@
 
     <div id="chart" class="chart"></div>
     <div id="forecastChart" class="chart"></div>
+    <div id="forecastIntervalChart" class="chart"></div>
 
     <script>
       const Color = {
@@ -173,6 +174,7 @@
           // getData();
           showChart();
           showForecastChart(document.querySelector("#forecastChart"));
+          showForecastIntervalChart(document.querySelector("#forecastIntervalChart"));
           for (let i = 0; i < 9; i++) {
             const container = document.createElement('div');
             container.setAttribute('class', 'charts-of-day');
@@ -292,12 +294,10 @@
       }
 
       async function showForecastChart(chartHtmlElement, date) {
-        const db = firebase.app().firestore();
-        const collection = db.collection('forecastsFixed');
         const result =
           date
-            ? await collection.where('date', '==', date.toJSDate()).get()
-            : await collection.orderBy('forecastDate', 'desc').limit(9).get();
+            ? await getForecasts(date)
+            : await getLatestForecasts();
         const mountainMaxTemperatureSeries = {
           name: "Mountain max temperature",
           data: [],
@@ -600,6 +600,31 @@
         chart.render();
       }
 
+      function getForecastCollection() {
+        return firebase.app().firestore().collection('forecastsFixed');
+      }
+
+      function getForecasts(date) {
+        return getForecastCollection()
+          .where('date', '==', date.toJSDate())
+          .get();
+      }
+
+      function getLatestForecasts() {
+        return getForecastCollection()
+          .orderBy('forecastDate', 'desc')
+          .limit(9)
+          .get();
+      }
+
+      function getLatestForecast(date) {
+        return getForecastCollection()
+          .where('date', '==', date.toJSDate())
+          .orderBy('forecastDate', 'desc')
+          .limit(1)
+          .get();
+      }
+
       async function showForecastIntervalChart(chartHtmlElement, date) {
         const mountainMaxTemperatureSeries = {
           name: "Mountain max temperature",
@@ -647,37 +672,38 @@
         };
         let temperatureMin = 0;
         let temperatureMax = 0;
-        const db = firebase.app().firestore();
-        const collection = db.collection('forecastsFixed');
         const result =
-          await collection
-            .where('date', '==', date.toJSDate())
-            .orderBy('forecastDate', 'desc')
-            .limit(1)
-            .get();
-        const forecast = result.docs[0].data();
-        // const date = luxon.DateTime.fromMillis(forecast.date.toMillis());
-        const intervalHourStep = forecast.intervals.length > 4 ? 3 : 6;
-        forecast.intervals.forEach((data, i) => {
-          const time = date.set({hour: 2 + i * intervalHourStep}).toJSDate().getTime();
-          const mountainMaxTemperature = parseTemperature(data.mountain.max);
-          const valleyMaxTemperature = parseTemperature(data.valley.max);
-          temperatureMin = Math.floor(Math.min(temperatureMin, mountainMaxTemperature, valleyMaxTemperature));
-          temperatureMax = Math.ceil(Math.max(temperatureMax, mountainMaxTemperature, valleyMaxTemperature));
-          mountainMaxTemperatureSeries.data.push([time, mountainMaxTemperature]);
-          mountainSnowSeries.data.push([time, parseSnow(data.mountain.snow)]);
-          valleyMaxTemperatureSeries.data.push([time, valleyMaxTemperature]);
-          valleySnowSeries.data.push([time, parseSnow(data.valley.snow)]);
-          probabilityOfPrecipitationSeries.data.push([time, data.probabilityOfPrecipitation]);
-          if (!data.rainfall.includes('%')) {
-            rainfallSeries.data.push([time, data.rainfall]);
+          date
+            ? await getLatestForecast(date)
+            : await getLatestForecasts();
+        result.forEach(doc => {
+          const forecast = doc.data();
+          if (!forecast.intervals) {
+            return;
           }
-          sunSeries.data.push([time, data.sun]);
-          snowLineSeries.data.push([time, parseFloat(parseSnowLine(data.snowLine))]);
-          thunderstormSeries.data.push([time, data.thunderstorm]);
-          const wind = parseWind(data.wind);
-          windMaxSeries.data.push([time, wind.max]);
-          windMinSeries.data.push([time, wind.min]);
+          const currentDate = luxon.DateTime.fromMillis(forecast.date.toMillis());
+          const intervalHourStep = forecast.intervals.length > 4 ? 3 : 6;
+          forecast.intervals.forEach((data, i) => {
+            const time = currentDate.set({hour: 2 + i * intervalHourStep}).toJSDate().getTime();
+            const mountainMaxTemperature = parseTemperature(data.mountain.max);
+            const valleyMaxTemperature = parseTemperature(data.valley.max);
+            temperatureMin = Math.floor(Math.min(temperatureMin, mountainMaxTemperature, valleyMaxTemperature));
+            temperatureMax = Math.ceil(Math.max(temperatureMax, mountainMaxTemperature, valleyMaxTemperature));
+            mountainMaxTemperatureSeries.data.push([time, mountainMaxTemperature]);
+            mountainSnowSeries.data.push([time, parseSnow(data.mountain.snow)]);
+            valleyMaxTemperatureSeries.data.push([time, valleyMaxTemperature]);
+            valleySnowSeries.data.push([time, parseSnow(data.valley.snow)]);
+            probabilityOfPrecipitationSeries.data.push([time, data.probabilityOfPrecipitation]);
+            if (!data.rainfall.includes('%')) {
+              rainfallSeries.data.push([time, data.rainfall]);
+            }
+            sunSeries.data.push([time, data.sun]);
+            snowLineSeries.data.push([time, parseFloat(parseSnowLine(data.snowLine))]);
+            thunderstormSeries.data.push([time, data.thunderstorm]);
+            const wind = parseWind(data.wind);
+            windMaxSeries.data.push([time, wind.max]);
+            windMinSeries.data.push([time, wind.min]);
+          });
         });
         const SemanticColor = {
           altitude: Color.darkGreen,
