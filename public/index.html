@@ -90,8 +90,17 @@
         }
 
         .chart {
-            max-width: 650px;
             margin: 35px auto;
+        }
+
+        .charts-of-day {
+            display: flex;
+            flex-direction: row;
+            align-content: stretch;
+        }
+
+        .charts-of-day .chart {
+            flex: 1 100%;
         }
     </style>
 </head>
@@ -108,11 +117,33 @@
 
     <div id="chart" class="chart"></div>
     <div id="forecastChart" class="chart"></div>
-    <div id="forecastTodayChart" class="chart"></div>
-    <div id="forecastTomorrowChart" class="chart"></div>
-    <div id="forecast-today-plus-2" class="chart"></div>
 
     <script>
+      const Color = {
+        darkRed: '#8B0000',
+        fireBrick: '#B22222',
+        red: '#FF0000',
+        orangeRed: '#FF4500',
+        tomato: '#FF6347',
+        salmon: '#FA8072',
+        gold: '#FFD700',
+        darkBlue: '#00008b',
+        mediumBlue: '#0000CD',
+        blue: '#0000ff',
+        indigo: '#4B0082',
+        rebeccaPurple: '#663399',
+        purple: '#800080',
+        slateGrey: '#708090',
+        snow: '#FFFAFA',
+        darkGrey: '#505050',
+        dimGrey: '#696969',
+        grey: '#808080',
+        lightGrey: '#D3D3D3',
+        darkGreen: '#006400',
+        highSpringGreen: '#00E396',
+        mediumSpringGreen: '#00FA9A',
+      };
+
       function today() {
         return luxon.DateTime.fromObject({
           hour: 0,
@@ -142,14 +173,19 @@
           // getData();
           showChart();
           showForecastChart(document.querySelector("#forecastChart"));
-          // showForecastChart(document.querySelector("#forecastTodayChart"), today());
-          // showForecastChart(document.querySelector("#forecastTomorrowChart"), today().plus({days: 1}));
           for (let i = 0; i < 9; i++) {
-            const e = document.createElement('div');
-            e.setAttribute('id', `forecast-${i}`);
-            e.setAttribute('class', 'chart');
-            document.body.appendChild(e);
-            showForecastChart(e, today().plus({days: i}));
+            const container = document.createElement('div');
+            container.setAttribute('class', 'charts-of-day');
+            const e1 = document.createElement('div');
+            e1.setAttribute('class', 'chart');
+            const e2 = document.createElement('div');
+            e2.setAttribute('class', 'chart');
+            const date = today().plus({days: i});
+            showForecastChart(e1, date);
+            showForecastIntervalChart(e2, date);
+            container.appendChild(e1);
+            container.appendChild(e2);
+            document.body.appendChild(container);
           }
         } catch (e) {
           console.error(e);
@@ -184,7 +220,7 @@
             .map(d => d.data())
             .map(({date, temperature}) =>
               [date.toDate().getTime(), temperature]);
-        console.log(data);
+        // console.log(data);
         const chart = new ApexCharts(document.querySelector("#chart"), {
           title: {
             text: 'Webcam Temperature',
@@ -319,11 +355,11 @@
         result.forEach(doc => {
           const data = doc.data();
           // console.log(`data`, data);
-          console.log(
-            luxon.DateTime.fromSeconds(data.date.seconds).toFormat('dd.MM.'),
-            luxon.DateTime.fromSeconds(data.forecastDate.seconds).toFormat('dd.MM. HH:mm'),
-            data,
-          );
+          // console.log(
+          //   luxon.DateTime.fromSeconds(data.date.seconds).toFormat('dd.MM.'),
+          //   luxon.DateTime.fromSeconds(data.forecastDate.seconds).toFormat('dd.MM. HH:mm'),
+          //   data,
+          // );
           const time =
             date
               ? data.forecastDate.toDate().getTime()
@@ -351,30 +387,6 @@
           windMaxSeries.data.push([time, wind.max]);
           windMinSeries.data.push([time, wind.min]);
         });
-        const Color = {
-          darkRed: '#8B0000',
-          fireBrick: '#B22222',
-          red: '#FF0000',
-          orangeRed: '#FF4500',
-          tomato: '#FF6347',
-          salmon: '#FA8072',
-          gold: '#FFD700',
-          darkBlue: '#00008b',
-          mediumBlue: '#0000CD',
-          blue: '#0000ff',
-          indigo: '#4B0082',
-          rebeccaPurple: '#663399',
-          purple: '#800080',
-          slateGrey: '#708090',
-          snow: '#FFFAFA',
-          darkGrey: '#505050',
-          dimGrey: '#696969',
-          grey: '#808080',
-          lightGrey: '#D3D3D3',
-          darkGreen: '#006400',
-          highSpringGreen: '#00E396',
-          mediumSpringGreen: '#00FA9A',
-        };
         const SemanticColor = {
           altitude: Color.darkGreen,
           probability: Color.indigo,
@@ -517,6 +529,288 @@
             series: sunSeries,
             color: Color.gold,
             yaxis: hiddenGenericYAxis,
+          },
+          {
+            series: snowLineSeries,
+            color: Color.highSpringGreen,
+            yaxis: altitudeYAxis,
+          },
+          {
+            series: thunderstormSeries,
+            color: Color.darkBlue,
+            yaxis: hiddenProbabilityYAxis,
+          },
+          {
+            series: windMaxSeries,
+            color: Color.indigo,
+            yaxis: hiddenGenericYAxis,
+          },
+          {
+            series: windMinSeries,
+            color: Color.rebeccaPurple,
+            yaxis: hiddenGenericYAxis,
+          },
+        ];
+        for (const s of seriesData) {
+          // s.data.sort(([l], [r]) => r - l);
+          s.series.data.sort(([l], [r]) => l - r);
+        }
+        // console.log('series', seriesData.map(s => ({
+        //   ...s.series,
+        //   data: s.series.data.map(([t, y]) => [luxon.DateTime.fromMillis(t).toFormat('HH:mm'), y])
+        // })));
+        const chart = new ApexCharts(chartHtmlElement, {
+          title: {
+            text:
+              date
+                ? `Forecasts for ${date.toFormat('DDDD')}`
+                : `Forecast of today for ${today().toFormat('dd.MM.')}-${today().plus({days: 8}).toFormat('dd.MM.')}`,
+          },
+          chart: {
+            height: 380,
+            width: "100%",
+            type: "line",
+            // type: "scatter",
+            animations: {
+              enabled: false,
+              initialAnimation: {
+                enabled: false
+              }
+            }
+          },
+          // stroke: {
+          //   curve: 'stepline',
+          // },
+          dataLabels: {
+            enabled: false
+          },
+          series: seriesData.map(s => s.series),
+          colors: seriesData.map(s => s.color),
+          xaxis: {
+            type: 'datetime'
+          },
+          yaxis: seriesData.map(s => s.yaxis),
+          tooltip: {
+            x: {
+              format: 'dd.MM. HH:mm'
+            }
+          }
+        });
+
+        chart.render();
+      }
+
+      async function showForecastIntervalChart(chartHtmlElement, date) {
+        const mountainMaxTemperatureSeries = {
+          name: "Mountain max temperature",
+          data: [],
+        };
+        const mountainSnowSeries = {
+          name: "Mountain snow (cm)",
+          data: [],
+        };
+        const valleyMaxTemperatureSeries = {
+          name: "Valley max temperature",
+          data: [],
+        };
+        const valleySnowSeries = {
+          name: "Valley snow (cm)",
+          data: [],
+        };
+        const probabilityOfPrecipitationSeries = {
+          name: 'Probability of precipitation',
+          data: [],
+        };
+        const rainfallSeries = {
+          name: 'Rainfall',
+          data: [],
+        };
+        const sunSeries = {
+          name: 'Sun',
+          data: [],
+        };
+        const snowLineSeries = {
+          name: 'Snow line',
+          data: [],
+        };
+        const thunderstormSeries = {
+          name: 'Thunderstorm',
+          data: [],
+        };
+        const windMaxSeries = {
+          name: 'Wind max',
+          data: [],
+        };
+        const windMinSeries = {
+          name: 'Wind min',
+          data: [],
+        };
+        let temperatureMin = 0;
+        let temperatureMax = 0;
+        const db = firebase.app().firestore();
+        const collection = db.collection('forecastsFixed');
+        const result =
+          await collection
+            .where('date', '==', date.toJSDate())
+            .orderBy('forecastDate', 'desc')
+            .limit(1)
+            .get();
+        const forecast = result.docs[0].data();
+        // const date = luxon.DateTime.fromMillis(forecast.date.toMillis());
+        const intervalHourStep = forecast.intervals.length > 4 ? 3 : 6;
+        forecast.intervals.forEach((data, i) => {
+          const time = date.set({hour: 2 + i * intervalHourStep}).toJSDate().getTime();
+          const mountainMaxTemperature = parseTemperature(data.mountain.max);
+          const valleyMaxTemperature = parseTemperature(data.valley.max);
+          temperatureMin = Math.floor(Math.min(temperatureMin, mountainMaxTemperature, valleyMaxTemperature));
+          temperatureMax = Math.ceil(Math.max(temperatureMax, mountainMaxTemperature, valleyMaxTemperature));
+          mountainMaxTemperatureSeries.data.push([time, mountainMaxTemperature]);
+          mountainSnowSeries.data.push([time, parseSnow(data.mountain.snow)]);
+          valleyMaxTemperatureSeries.data.push([time, valleyMaxTemperature]);
+          valleySnowSeries.data.push([time, parseSnow(data.valley.snow)]);
+          probabilityOfPrecipitationSeries.data.push([time, data.probabilityOfPrecipitation]);
+          if (!data.rainfall.includes('%')) {
+            rainfallSeries.data.push([time, data.rainfall]);
+          }
+          sunSeries.data.push([time, data.sun]);
+          snowLineSeries.data.push([time, parseFloat(parseSnowLine(data.snowLine))]);
+          thunderstormSeries.data.push([time, data.thunderstorm]);
+          const wind = parseWind(data.wind);
+          windMaxSeries.data.push([time, wind.max]);
+          windMinSeries.data.push([time, wind.min]);
+        });
+        const SemanticColor = {
+          altitude: Color.darkGreen,
+          probability: Color.indigo,
+          snow: Color.darkGrey,
+          sun: Color.gold,
+          temperature: Color.darkRed,
+        };
+        const getY = ([, y]) => y;
+        const temperatureYAxis = {
+          title: {
+            text: 'Temperature',
+            style: {color: SemanticColor.temperature}
+          },
+          // seriesName: valleyMaxTemperatureSeries.name,
+          min: temperatureMin,
+          max: temperatureMax,
+          forceNiceScale: true,
+          tickAmount: Math.round((Math.abs(temperatureMin) + Math.abs(temperatureMax)) / 2),
+          labels: {
+            style: {color: SemanticColor.temperature},
+            formatter(value) {
+              return value && `${value.toFixed(1)}°C`
+            },
+          }
+        };
+        const hiddenTemperatureYAxis = {
+          ...temperatureYAxis,
+          show: false,
+        };
+        const snowYAxis = {
+          title: {
+            text: 'Snow',
+            style: {color: SemanticColor.snow}
+          },
+          seriesName: valleySnowSeries.name,
+          labels: {
+            style: {color: SemanticColor.snow},
+            formatter(value) {
+              return value && `${value.toFixed(0)}cm`
+            },
+          }
+        };
+        const hiddenSnowYAxis = {
+          ...snowYAxis,
+          show: false,
+        };
+        const probabilityYAxis = {
+          title: {
+            text: 'Probability',
+            style: {color: SemanticColor.probability}
+          },
+          // seriesName: probabilityOfPrecipitationSeries.name,
+          min: 0,
+          max: 100,
+          labels: {
+            style: {color: SemanticColor.probability},
+            formatter(value) {
+              return value && `${value.toFixed(0)}%`
+            },
+          }
+        };
+        const hiddenProbabilityYAxis = {
+          ...probabilityYAxis,
+          show: false,
+        };
+        const altitudeYAxis = {
+          title: {
+            text: 'Altitude',
+            style: {color: SemanticColor.altitude}
+          },
+          seriesName: snowLineSeries.name,
+          opposite: true,
+          labels: {
+            style: {color: SemanticColor.altitude},
+            formatter(value) {
+              return value && `${value}m`
+            },
+          }
+        };
+        const genericYAxis = {
+          title: {
+            text: 'liter, hours, wind strength',
+            // style: {color: SemanticColor.generic}
+          },
+          seriesName: rainfallSeries.name,
+          opposite: true,
+          labels: {
+            // style: {color: SemanticColor.generic},
+            // formatter(value) {
+            //   return value && `${value}m`
+            // },
+          }
+        };
+        const hiddenGenericYAxis = {
+          ...genericYAxis,
+          show: false,
+        };
+        const seriesData = [
+          {
+            series: mountainMaxTemperatureSeries,
+            color: Color.orangeRed,
+            yaxis: temperatureYAxis,
+          },
+          {
+            series: mountainSnowSeries,
+            color: Color.dimGrey,
+            yaxis: snowYAxis,
+          },
+          {
+            series: valleyMaxTemperatureSeries,
+            color: Color.fireBrick,
+            yaxis: hiddenTemperatureYAxis,
+          },
+          {
+            series: valleySnowSeries,
+            color: Color.grey,
+            yaxis: hiddenSnowYAxis,
+          },
+          {
+            series: probabilityOfPrecipitationSeries,
+            color: Color.mediumBlue,
+            yaxis: probabilityYAxis,
+          },
+          {
+            series: rainfallSeries,
+            color: Color.blue,
+            yaxis: genericYAxis,
+          },
+          {
+            series: sunSeries,
+            color: Color.gold,
+            yaxis: hiddenProbabilityYAxis,
           },
           {
             series: snowLineSeries,
