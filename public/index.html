@@ -551,7 +551,7 @@
           title: {
             text:
               date
-                ? `Forecasts for ${date.toFormat('dd.MM.')}`
+                ? `Forecasts for ${date.toFormat('DDDD')}`
                 : `Forecast of today for ${today().toFormat('dd.MM.')}-${today().plus({days: 8}).toFormat('dd.MM.')}`,
           },
           chart: {
