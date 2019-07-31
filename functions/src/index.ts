@@ -170,6 +170,10 @@ async function storeWebcamData(data: WebcamData): Promise<string | null> {
   return null;
 }
 
+function formatDateTime(time: FirebaseFirestore.Timestamp | undefined) {
+  return time && DateTime.fromMillis(time.toMillis()).toFormat('dd.MM. HH:mm');
+}
+
 export const webcam =
   functions.https.onRequest(async (request, response) => {
     const result = await getWebcamData(webcamUrl);
@@ -214,4 +218,74 @@ export const scheduledStoreForecast =
 export const currentDate =
   functions.https.onRequest(async (request, response) => {
     response.send(DateTime.local().setZone('Europe/Berlin').toFormat('dd.MM. HH:mm'));
+  });
+
+export const get =
+  functions.https.onRequest(async (request, response) => {
+    const db = admin.firestore();
+    const webcamsCollection = db.collection(request.query.collection);
+    const doc = await webcamsCollection.doc(request.query.id).get();
+    if (doc.exists) {
+      const {id, createTime, updateTime} = doc;
+      const data: any = doc.data();
+      if (data.date) {
+        data.date = formatDateTime(data.date);
+      }
+      if (data.forecastDate) {
+        data.forecastDate = formatDateTime(data.forecastDate);
+      }
+      response.json({
+        id,
+        createTime: formatDateTime(createTime),
+        updateTime: formatDateTime(updateTime),
+        data,
+      });
+    } else {
+      response.json(null);
+    }
+  });
+
+// export const fix =
+//   functions.https.onRequest(async (request, response) => {
+//     const db = admin.firestore();
+//     const webcamsCollection = db.collection(request.query.collection);
+//     const doc =
+//       await webcamsCollection.doc(request.query.id).get();
+//     if (doc.exists) {
+//       const data: any = doc.data();
+//       console.log(request.query.id);
+//       console.log(DateTime.fromJSDate(data.date.toDate()).plus({day: 1}).toJSDate());
+//       await webcamsCollection.doc(request.query.id)
+//         .update({
+//           date:
+//             DateTime.fromJSDate(data.date.toDate())
+//               .plus({day: 1})
+//               .toJSDate()
+//         });
+//       response.send('success');
+//     } else {
+//       response.json(null);
+//     }
+//   });
+
+export const getInvalid =
+  functions.https.onRequest(async (request, response) => {
+    const db = admin.firestore();
+    const webcamsCollection = db.collection(request.query.collection);
+    const docs = await webcamsCollection.get();
+    const invalidDocs: any[] = [];
+    docs.forEach(doc => {
+      const {id, createTime, updateTime} = doc;
+      const data: any = doc.data();
+      if (data.date.toMillis() > createTime.toMillis()) {
+        data.date = formatDateTime(data.date);
+        invalidDocs.push({
+          id,
+          createTime: formatDateTime(createTime),
+          updateTime: formatDateTime(updateTime),
+          data,
+        });
+      }
+    });
+    response.json(invalidDocs);
   });
