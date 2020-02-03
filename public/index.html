@@ -216,7 +216,9 @@
       async function showChart() {
         const db = firebase.app().firestore();
         const webcamsCollection = db.collection('webcamsFixed');
-        const result = await webcamsCollection.orderBy('date', 'desc').get();
+        const result = await webcamsCollection
+          .where('date', '>', today().minus({days: 14}).toJSDate())
+          .orderBy('date', 'desc').get();
         const data =
           result.docs
             .map(d => d.data())
