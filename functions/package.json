@@ -3,10 +3,10 @@
   "scripts": {
     "lint": "tslint --project tsconfig.json",
     "build": "tsc",
-    "serve": "yarn run build && firebase serve --only functions",
+    "serve": "yarn run build && firebase serve",
     "shell": "yarn run build && firebase functions:shell",
     "start": "yarn run shell",
-    "deploy": "firebase deploy --only functions",
+    "deploy": "firebase deploy",
     "logs": "firebase functions:log"
   },
   "engines": {
